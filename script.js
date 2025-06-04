@@ -1,6 +1,67 @@
 let currentData = [];
 let npshChart = null;
 
+// Pump metadata management
+let currentPumpMetadata = {
+    pumpType: '',
+    ratedFlow: 0,
+    aorMin: 0,
+    aorMax: 0,
+    porMin: 0,
+    porMax: 0,
+    ratedNPSHr: 0
+};
+
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize event listeners
+    initializeEventListeners();
+    
+    // Check if key elements exist
+    validateRequiredElements();
+});
+
+function initializeEventListeners() {
+    const fileInput = document.getElementById('csvFile');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileSelect);
+        console.log('File input listener attached successfully');
+    }
+    
+    // Ensure other buttons have listeners
+    const clearButton = document.querySelector('.btn.btn-secondary');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearData);
+    }
+    
+    const configButton = document.querySelector('button[onclick="openPumpConfigModal()"]');
+    if (configButton) {
+        // Remove inline handler and use addEventListener
+        configButton.removeAttribute('onclick');
+        configButton.addEventListener('click', openPumpConfigModal);
+    }
+}
+
+function validateRequiredElements() {
+    const requiredElements = [
+        'csvFile', 'pumpConfigModal', 'loading', 'successAlert', 'errorAlert',
+        'dataBody', 'stats', 'chartContainer', 'npshChart', 'pumpMetadata'
+    ];
+    
+    let allFound = true;
+    requiredElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (!element) {
+            console.error(`Required element not found: #${id}`);
+            allFound = false;
+        }
+    });
+    
+    if (allFound) {
+        console.log('All required elements found in the DOM');
+    }
+}
+
 document.getElementById('csvFile').addEventListener('change', handleFileSelect);
 
 function handleFileSelect(event) {
@@ -385,19 +446,193 @@ function updateChart() {
                         display: false
                     }
                 },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'NPSH (m)',
-                        font: {
-                            weight: 'bold'
-                        }
-                    },
-                    beginAtZero: false
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'NPSH (m)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        beginAtZero: false
+                    }
                 }
             }
+        });
+    
+    // Only add these if pump metadata is available
+    if (currentPumpMetadata.pumpType) {
+        const datasets = npshChart.data.datasets;
+        const maxY = Math.max(...npshaValues, ...npshrValues) * 1.2;
+
+        // Add AOR range as a properly shaded vertical band
+        datasets.push({
+            label: 'AOR Range',
+            data: [
+                { x: currentPumpMetadata.aorMin, y: 0 },
+                { x: currentPumpMetadata.aorMin, y: maxY },
+                { x: currentPumpMetadata.aorMax, y: maxY },
+                { x: currentPumpMetadata.aorMax, y: 0 }
+            ],
+            backgroundColor: 'rgba(108, 142, 191, 0.15)',
+            borderColor: 'rgba(108, 142, 191, 0.5)',
+            borderWidth: 1,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            segment: { borderDash: [5, 5] }
+        });
+        
+        // Add POR range as a properly shaded vertical band with green highlight
+        datasets.push({
+            label: 'POR Range',
+            data: [
+                { x: currentPumpMetadata.porMin, y: 0 },
+                { x: currentPumpMetadata.porMin, y: maxY },
+                { x: currentPumpMetadata.porMax, y: maxY },
+                { x: currentPumpMetadata.porMax, y: 0 }
+            ],
+            backgroundColor: 'rgba(46, 204, 113, 0.2)',
+            borderColor: 'rgba(46, 204, 113, 0.6)',
+            borderWidth: 1,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            segment: { borderDash: [5, 5] }
+        });
+
+        // Add vertical line for rated flow with label
+        datasets.push({
+            label: 'Rated Flow',
+            data: [
+                { x: currentPumpMetadata.ratedFlow, y: 0 },
+                { x: currentPumpMetadata.ratedFlow, y: maxY }
+            ],
+            borderColor: '#9b59b6',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false
+        });
+        
+        // Add vertical line for runout flow (aorMax)
+        datasets.push({
+            label: 'Runout Flow',
+            data: [
+                { x: currentPumpMetadata.aorMax, y: 0 },
+                { x: currentPumpMetadata.aorMax, y: maxY }
+            ],
+            borderColor: '#e67e22',
+            borderWidth: 2,
+            borderDash: [8, 4],
+            pointRadius: 0,
+            fill: false
+        });
+        
+        // Add annotations for key points
+        npshChart.options.plugins.annotation = {
+            annotations: {
+                ratedFlowLabel: {
+                    type: 'label',
+                    xValue: currentPumpMetadata.ratedFlow,
+                    yValue: maxY * 0.95,
+                    content: [`Rated Flow`, `(${currentPumpMetadata.ratedFlow} m³/h)`],
+                    backgroundColor: 'rgba(155, 89, 182, 0.7)',
+                    color: 'white',
+                    font: {
+                        size: 11
+                    },
+                    padding: 4
+                },
+                runoutFlowLabel: {
+                    type: 'label',
+                    xValue: currentPumpMetadata.aorMax,
+                    yValue: maxY * 0.85,
+                    content: [`Runout Flow`, `(${currentPumpMetadata.aorMax} m³/h)`],
+                    backgroundColor: 'rgba(230, 126, 34, 0.7)',
+                    color: 'white',
+                    font: {
+                        size: 11
+                    },
+                    padding: 4
+                },
+                aorLabel: {
+                    type: 'label',
+                    xValue: (currentPumpMetadata.aorMin + currentPumpMetadata.aorMax) / 2,
+                    yValue: maxY * 0.10,
+                    content: 'Allowable Operating Range',
+                    backgroundColor: 'rgba(108, 142, 191, 0.3)',
+                    color: '#2c3e50',
+                    font: {
+                        size: 12
+                    },
+                    padding: 6
+                },
+                porLabel: {
+                    type: 'label',
+                    xValue: (currentPumpMetadata.porMin + currentPumpMetadata.porMax) / 2,
+                    yValue: maxY * 0.20,
+                    content: 'Preferred Operating Range',
+                    backgroundColor: 'rgba(46, 204, 113, 0.3)',
+                    color: '#2c3e50',
+                    font: {
+                        size: 12
+                    },
+                    padding: 6
+                }
+            }
+        };
+    }
+    
+    // Update chart options to include custom tooltips for pump metadata
+    npshChart.options.plugins.tooltip.callbacks.afterBody = function(tooltipItems) {
+        const tooltipItem = tooltipItems[0];
+        const flowRate = tooltipItem.parsed.x;
+        
+        if (!currentPumpMetadata.pumpType) return null;
+        
+        let operationStatus = '';
+        let statusEmoji = '';
+        let statusInfo = '';
+        
+        if (flowRate < currentPumpMetadata.aorMin) {
+            statusEmoji = '⚠️';
+            operationStatus = 'Below Minimum Flow';
+            statusInfo = 'Risk of pump overheating and damage';
+        } else if (flowRate > currentPumpMetadata.aorMax) {
+            statusEmoji = '⚠️';
+            operationStatus = 'Above Runout Flow';
+            statusInfo = 'Risk of motor overload and bearing damage';
+        } else if (flowRate < currentPumpMetadata.porMin || flowRate > currentPumpMetadata.porMax) {
+            statusEmoji = '⚠️';
+            operationStatus = 'Outside Preferred Range';
+            statusInfo = 'Reduced efficiency and increased wear';
+        } else {
+            statusEmoji = '✅';
+            operationStatus = 'Within Preferred Range';
+            statusInfo = 'Optimal efficiency and reliability';
         }
-    });
+        
+        // Check if this is the rated flow point
+        let specialPoint = '';
+        if (Math.abs(flowRate - currentPumpMetadata.ratedFlow) < 5) {
+            specialPoint = '⭐ Near Rated Flow Point';
+        } else if (Math.abs(flowRate - currentPumpMetadata.aorMax) < 5) {
+            specialPoint = '⚡ Near Runout Flow Point';
+        }
+        
+        const result = [
+            `Pump: ${currentPumpMetadata.pumpType}`,
+            `${statusEmoji} ${operationStatus}`,
+            statusInfo
+        ];
+        
+        if (specialPoint) {
+            result.push(specialPoint);
+        }
+        
+        return result;
+    };
     
     // Show the chart container
     chartContainer.style.display = 'block';
@@ -448,4 +683,117 @@ function showAlert(message, type) {
 function hideAlerts() {
     document.getElementById('successAlert').style.display = 'none';
     document.getElementById('errorAlert').style.display = 'none';
+}
+
+// Pump metadata management
+function loadPumpMetadata(pumpData) {
+    currentPumpMetadata = {...pumpData};
+    displayPumpMetadata();
+    updateChart(); // Redraw chart with new pump data
+}
+
+function displayPumpMetadata() {
+    const metadataContainer = document.getElementById('pumpMetadata');
+    if (!metadataContainer) return;
+    
+    if (!currentPumpMetadata.pumpType) {
+        metadataContainer.style.display = 'none';
+        return;
+    }
+    
+    metadataContainer.innerHTML = `
+        <div class="metadata-item">
+            <span class="metadata-label">Pump Type:</span>
+            <span class="metadata-value">${currentPumpMetadata.pumpType}</span>
+        </div>
+        <div class="metadata-item">
+            <span class="metadata-label">Rated Flow:</span>
+            <span class="metadata-value">${currentPumpMetadata.ratedFlow} m³/h</span>
+        </div>
+        <div class="metadata-item">
+            <span class="metadata-label">AOR Range:</span>
+            <span class="metadata-value">${currentPumpMetadata.aorMin}–${currentPumpMetadata.aorMax} m³/h</span>
+        </div>
+        <div class="metadata-item">
+            <span class="metadata-label">POR Range:</span>
+            <span class="metadata-value">${currentPumpMetadata.porMin}–${currentPumpMetadata.porMax} m³/h</span>
+        </div>
+        <div class="metadata-item">
+            <span class="metadata-label">Rated NPSHr:</span>
+            <span class="metadata-value">${currentPumpMetadata.ratedNPSHr} m</span>
+        </div>
+    `;
+    
+    metadataContainer.style.display = 'flex';
+}
+
+// Pump configuration modal functions
+function openPumpConfigModal() {
+    const modal = document.getElementById('pumpConfigModal');
+    if (!modal) return;
+    
+    // Populate fields with current data if available
+    if (currentPumpMetadata.pumpType) {
+        document.getElementById('pumpType').value = currentPumpMetadata.pumpType;
+        document.getElementById('ratedFlow').value = currentPumpMetadata.ratedFlow;
+        document.getElementById('aorMin').value = currentPumpMetadata.aorMin;
+        document.getElementById('aorMax').value = currentPumpMetadata.aorMax;
+        document.getElementById('porMin').value = currentPumpMetadata.porMin;
+        document.getElementById('porMax').value = currentPumpMetadata.porMax;
+        document.getElementById('ratedNPSHr').value = currentPumpMetadata.ratedNPSHr;
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeModal() {
+    const modal = document.getElementById('pumpConfigModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function savePumpConfig() {
+    const pumpData = {
+        pumpType: document.getElementById('pumpType').value,
+        ratedFlow: parseFloat(document.getElementById('ratedFlow').value) || 0,
+        aorMin: parseFloat(document.getElementById('aorMin').value) || 0,
+        aorMax: parseFloat(document.getElementById('aorMax').value) || 0,
+        porMin: parseFloat(document.getElementById('porMin').value) || 0,
+        porMax: parseFloat(document.getElementById('porMax').value) || 0,
+        ratedNPSHr: parseFloat(document.getElementById('ratedNPSHr').value) || 0
+    };
+    
+    loadPumpMetadata(pumpData);
+    closeModal();
+    showAlert('Pump configuration saved successfully', 'success');
+}
+
+function loadPresetPump() {
+    // Predefined pump configurations
+    const presets = [
+        {
+            pumpType: '8x15DMX-3',
+            ratedFlow: 480,
+            aorMin: 480,
+            aorMax: 1073,
+            porMin: 653,
+            porMax: 1026,
+            ratedNPSHr: 16.4
+        },
+        {
+            pumpType: '6x10DMX-2',
+            ratedFlow: 320,
+            aorMin: 320,
+            aorMax: 850,
+            porMin: 450,
+            porMax: 780,
+            ratedNPSHr: 12.8
+        }
+        // Add more presets as needed
+    ];
+    
+    // For simplicity, just load the first preset
+    // In a real app, you might want to show a selection dialog
+    loadPumpMetadata(presets[0]);
+    closeModal();
+    showAlert(`Loaded preset pump configuration: ${presets[0].pumpType}`, 'success');
 }
