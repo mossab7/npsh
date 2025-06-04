@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPSH Cavitation Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 NPSH Cavitation Analyzer</h1>
+            <p>Advanced Pump Cavitation Risk Analysis</p>
+        </div>
+
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                <button class="btn">
+                    📂 Load CSV File
+                </button>
+            </div>
+            <button class="btn btn-secondary" onclick="clearData()">
+                🗑️ Clear Data
+            </button>
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <span>Processing...</span>
+            </div>
+        </div>
+
+        <div class="alert alert-success" id="successAlert"></div>
+        <div class="alert alert-error" id="errorAlert"></div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-number" id="totalRecords">0</div>
+                <div class="stat-label">Total Records</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number safe" id="safeCount">0</div>
+                <div class="stat-label">Safe Operations</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number danger" id="dangerCount">0</div>
+                <div class="stat-label">Cavitation Risk</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="riskPercentage">0%</div>
+                <div class="stat-label">Risk Percentage</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>🌡️ Temperature (°C)</th>
+                            <th>⚡ Pressure (bar)</th>
+                            <th>💧 Flow Rate (m³/h)</th>
+                            <th>🔧 NPSHr (m)</th>
+                            <th>📏 NPSHa (m)</th>
+                            <th>🚨 Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataBody">
+                        <tr>
+                            <td colspan="6" class="no-data">
+                                No data loaded. Please select a CSV file to analyze.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 Advanced NPSH Cavitation Analysis Tool | Built with Modern Web Technologies</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
